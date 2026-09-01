@@ -1,0 +1,1 @@
+const CACHE='hydro-v3';self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html','./style.css','./js/app.js','./js/firebase.js','./js/mqtt.js']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
