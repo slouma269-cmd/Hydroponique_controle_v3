@@ -22,3 +22,9 @@
 .control-config summary{cursor:pointer;font-weight:750}.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}.config-grid label{font-size:12px;color:var(--muted)}.config-grid input{width:100%;margin-top:5px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:11px;padding:9px}
 .save-config{margin-top:10px}.danger-note{color:var(--red);font-size:12px;margin-top:8px}
 @media(max-width:380px){.config-grid{grid-template-columns:1fr}}
+/* v16 — Data PDF / Gmail export only */
+.data-export{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:14px}
+.data-export small{display:block;color:var(--muted);margin-top:4px;font-size:11px}
+.data-export-actions{display:flex;gap:8px;flex-shrink:0}
+.data-export-actions button{min-width:92px}
+@media(max-width:420px){.data-export{align-items:stretch;flex-direction:column}.data-export-actions{width:100%}.data-export-actions button{flex:1}}
