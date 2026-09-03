@@ -12,10 +12,18 @@
 <div id="controlSafety" class="control-safety panel">🛡️ <span data-i18n="controlSafety">الأجهزة تعمل حسب قواعد الأمان المحددة. التحكم اليدوي قد يُمنع عند وجود حالة خطرة.</span></div>
 <div class="control-section-title"><div><h2>💧 الري والتغذية</h2><small>المضخات وحالة الخزان</small></div></div><div id="controlsIrrigation" class="control-grid"></div>
 <div class="control-section-title"><div><h2>🌬️ التهوية والتبريد</h2><small>الحرارة والرطوبة والتبريد</small></div></div><div id="controlsClimate" class="control-grid"></div></section>
-<section id="alerts" class="page"><h1>🔔 <span data-i18n="alerts">التنبيهات</span></h1><div id="alertsList"></div></section>
+<section id="alerts" class="page">
+<h1>🔔 <span data-i18n="alerts">التنبيهات</span></h1>
+<div class="alerts-toolbar panel">
+  <div class="alerts-toolbar-main"><div class="alerts-bell">🔔</div><div><b id="alertsTitle">تنبيهات النظام</b><small id="alertsSubtitle">مراقبة الحرارة والرطوبة والماء واتصال النظام</small></div></div>
+  <div class="alerts-actions"><button id="notificationPermission" class="primary">🔔 تفعيل إشعارات الهاتف</button><button id="clearAlerts" class="secondary">🗑️ مسح السجل</button></div>
+  <div id="notificationStatus" class="notification-status"></div>
+</div>
+<div id="alertsList"></div>
+</section>
 <section id="settings" class="page"><h1>⚙️ <span data-i18n="settings">الإعدادات</span></h1><div class="panel settings"><label><span data-i18n="language">اللغة</span><select id="language"><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option></select></label><label><span data-i18n="theme">المظهر</span><select id="theme"><option value="system">النظام</option><option value="light">فاتح</option><option value="dark">داكن</option></select></label><hr><h3>📡 HiveMQ</h3><label>Host<input id="mqttHost" readonly value="99580666d99a4632b4a1d5087e22d494.s1.eu.hivemq.cloud"></label><label>WebSocket Port<input id="mqttPort" readonly value="8884"></label><label>Username<input id="mqttUser" readonly value="hydro_app"></label><label><span data-i18n="mqttPassword">كلمة مرور MQTT</span><input id="mqttPassword" type="password" autocomplete="new-password" placeholder="أدخلها مرة واحدة"></label><label class="check"><input id="mqttRemember" type="checkbox" checked><span data-i18n="rememberMqtt">تذكر كلمة المرور على هذا الجهاز</span></label><button id="mqttSave" class="primary full" data-i18n="saveConnect">حفظ والاتصال</button><div id="mqttHint" class="hint"></div></div><div class="panel"><h3>🔥 Firebase</h3><p id="userEmail">—</p><button id="logout" class="danger full" data-i18n="logout">تسجيل الخروج</button></div></section>
 <section id="growth" class="page"><div class="page-head"><button class="back" data-back="home">‹</button><div><h1>🌱 <span data-i18n="growth">نمو النباتات</span></h1><small class="growth-page-sub">تتبع المراحل وسجل pH وEC والتذكيرات</small></div></div><button id="newGroup" type="button" class="primary full" onclick="window.openNewGroup && window.openNewGroup()">＋ <span data-i18n="newGroup">مجموعة جديدة</span></button><div id="groups"></div></section>
 </main>
 <nav id="bottomNav"><button class="nav active" data-page="home">🏠<small data-i18n="home">الرئيسية</small></button><button class="nav" data-page="data">📊<small data-i18n="data">البيانات</small></button><button class="nav" data-page="control">🎛️<small data-i18n="control">التحكم</small></button><button class="nav" data-page="alerts">🔔<small data-i18n="alerts">التنبيهات</small></button><button class="nav" data-page="settings">⚙️<small data-i18n="settings">الإعدادات</small></button></nav>
 </div>
-<div id="modal" class="modal hidden"></div><div id="toast" class="toast"></div><script type="module" src="js/app.js?v=17"></script></body></html>
+<div id="modal" class="modal hidden"></div><div id="toast" class="toast"></div><script type="module" src="js/app.js?v=18"></script></body></html>
