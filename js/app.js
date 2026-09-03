@@ -14,17 +14,27 @@ async function loadSensorHistory(){
   if(!auth.currentUser)return;
   try{
     const cutoff=Date.now()-SENSOR_HISTORY_DAYS*86400000;
-    const q=query(sensorHistoryRef(),where('timeMs','>=',cutoff),orderBy('timeMs','asc'),limit(SENSOR_HISTORY_MAX));
-    const snap=await getDocs(q);
+    // Read the user's sensor collection directly, then filter/sort locally.
+    // This avoids query/index issues while keeping the same 7-day history.
+    const snap=await getDocs(sensorHistoryRef());
     const rows=[];
-    snap.forEach(d=>{const x=d.data();rows.push(normalizeReading({...x,timeMs:Number(x.timeMs),time:new Date(Number(x.timeMs))}))});
-    mergeSensorHistory(rows);
+    snap.forEach(d=>{
+      const x=d.data()||{};
+      const tm=Number(x.timeMs);
+      if(!Number.isFinite(tm)||tm<cutoff)return;
+      rows.push(normalizeReading({...x,timeMs:tm,time:new Date(tm)}));
+    });
+    rows.sort((a,b)=>a.timeMs-b.timeMs);
+    mergeSensorHistory(rows.slice(-SENSOR_HISTORY_MAX));
     sensorHistoryLoaded=true;
     renderData();
   }catch(e){
     console.error('Sensor history load failed:',e);
     sensorHistoryLoaded=true;
-    if(e?.code!=='permission-denied')toast(controlText('تعذر تحميل سجل الحساسات','Could not load sensor history','Impossible de charger l’historique des capteurs'));
+    const msg=e?.code==='permission-denied'
+      ?controlText('لا توجد صلاحية لقراءة سجل الحساسات. تحقق من تسجيل الدخول وقواعد Firestore.','No permission to read sensor history. Check login and Firestore Rules.','Accès refusé à l’historique des capteurs. Vérifiez la connexion et les règles Firestore.')
+      :controlText('تعذر تحميل سجل الحساسات','Could not load sensor history','Impossible de charger l’historique des capteurs');
+    toast(msg);
   }
 }
 async function saveSensorReading(reading,tm){
