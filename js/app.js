@@ -53,7 +53,14 @@ async function saveSensorReading(reading,tm){
     lastSensorSaveMinute=0;
   }finally{sensorSaveBusy=false}
 }
-const limits={airTemperature:[28,30],airHumidity:[75,80],waterTemperature:[18,28],waterLevel:[20,40]};
+const limits={
+ airTemperature:{range:[0,50],normal:[18,28],warning:[15,32],danger:[0,15,32,50]},
+ airHumidity:{range:[0,100],normal:[50,70],warning:[40,80],danger:[0,40,80,100]},
+ waterTemperature:{range:[0,35],normal:[18,25],warning:[15,28],danger:[0,15,28,35]},
+ waterLevel:{range:[0,100],normal:[40,100],warning:[20,40],danger:[0,20]},
+ ph:{range:[0,14],normal:[5.5,6.5],warning:[5.0,7.0],danger:[0,5.0,7.0,14]},
+ ec:{range:[0,3],normal:[1.2,1.8],warning:[1.0,2.0],danger:[0,1.0,2.0,3]}
+};
 const ALERTS_MAX=100;
 let alerts=[],alertState={},alertsLoaded=false;
 const ALERT_CFG={airTemperature:{on:30,type:'highTemp',level:'critical',icon:'🌡️'},airHumidity:{on:80,type:'highHumidity',level:'warning',icon:'💧'},waterTemperature:{on:28,type:'highWaterTemp',level:'warning',icon:'🌊'},waterLevel:{on:20,type:'lowWater',level:'critical',icon:'🚨'}};
@@ -114,7 +121,49 @@ function initAlerts(){const b=$('#notificationPermission'),c=$('#clearAlerts');i
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}function t(k){return I[lang][k]||I.ar[k]||k}function applyLang(){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';$$('[data-i18n]').forEach(e=>e.textContent=t(e.dataset.i18n));$('#language').value=lang;localStorage.setItem('hydro_lang',lang)}
 function page(p){$$('.page').forEach(e=>e.classList.toggle('active',e.id===p));$$('.nav').forEach(e=>e.classList.toggle('active',e.dataset.page===p));if(p==='growth')loadGroups();if(p==='data')setTimeout(renderData,0)}$$('.nav').forEach(b=>b.onclick=()=>page(b.dataset.page));$$('[data-open]').forEach(b=>b.onclick=()=>page(b.dataset.open));$$('[data-back]').forEach(b=>b.onclick=()=>page(b.dataset.back));$('#bell')?.addEventListener('click',()=>{localStorage.setItem('hydro_alert_seen',String(Date.now()));renderAlerts();page('alerts')});
-function gauge(key,label,icon,unit,min,max){const v=tele[key];let pct=v==null?0:Math.max(0,Math.min(100,(v-min)/(max-min)*100));const bad=v!=null&&((key==='airTemperature'&&v>=limits.airTemperature[1])||(key==='airHumidity'&&v>=limits.airHumidity[1])||(key==='waterTemperature'&&v>=limits.waterTemperature[1])||(key==='waterLevel'&&v<=limits.waterLevel[0]));return `<article class="gauge-card ${bad?'danger-gauge':''}"><div class="gauge" style="--pct:${pct}%;--gcolor:${bad?'var(--red)':key==='airTemperature'?'var(--orange)':'var(--green)'}"><div class="gauge-inner"><div class="gauge-value">${v==null?'—':Number(v).toFixed(key==='airHumidity'||key==='waterLevel'?0:1)}${v==null?'':unit}</div></div></div><div class="gauge-label">${icon} ${label}</div><div class="gauge-status">${bad?'⚠️ '+(lang==='ar'?'خارج النطاق':lang==='fr'?'Hors plage':'Out of range'):v==null?'—':lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'}</div></article>`}
+function gaugeStatus(key,v){
+ if(v==null||!Number.isFinite(Number(v)))return {cls:'unknown',label:lang==='ar'?'لا توجد قراءة':lang==='fr'?'Aucune lecture':'No reading'};
+ const x=Number(v),c=limits[key];
+ if(key==='waterLevel'){
+   if(x<=c.danger[1])return {cls:'danger',label:lang==='ar'?'خطر':lang==='fr'?'Danger':'Danger'};
+   if(x<c.normal[0])return {cls:'warning',label:lang==='ar'?'تحذير':lang==='fr'?'Avertissement':'Warning'};
+   return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+ }
+ if(key==='airHumidity'){
+   if(x<40||x>80)return {cls:'danger',label:lang==='ar'?'خطر':lang==='fr'?'Danger':'Danger'};
+   if(x<50||x>70)return {cls:'warning',label:lang==='ar'?'تحذير':lang==='fr'?'Avertissement':'Warning'};
+   return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+ }
+ if(key==='ph'){
+   if(x<5||x>7)return {cls:'danger',label:lang==='ar'?'خطر':lang==='fr'?'Danger':'Danger'};
+   if(x<5.5||x>6.5)return {cls:'warning',label:lang==='ar'?'تحذير':lang==='fr'?'Avertissement':'Warning'};
+   return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+ }
+ if(key==='ec'){
+   if(x<1||x>2)return {cls:'danger',label:lang==='ar'?'خطر':lang==='fr'?'Danger':'Danger'};
+   if(x<1.2||x>1.8)return {cls:'warning',label:lang==='ar'?'تحذير':lang==='fr'?'Avertissement':'Warning'};
+   return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+ }
+ if(key==='airTemperature'){
+   if(x<15||x>=32)return {cls:'danger',label:lang==='ar'?'خطر':lang==='fr'?'Danger':'Danger'};
+   if(x<18||x>=28)return {cls:'warning',label:lang==='ar'?'تحذير':lang==='fr'?'Avertissement':'Warning'};
+   return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+ }
+ if(key==='waterTemperature'){
+   if(x<15||x>28)return {cls:'danger',label:lang==='ar'?'خطر':lang==='fr'?'Danger':'Danger'};
+   if(x<18||x>25)return {cls:'warning',label:lang==='ar'?'تحذير':lang==='fr'?'Avertissement':'Warning'};
+   return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+ }
+ return {cls:'normal',label:lang==='ar'?'طبيعي':lang==='fr'?'Normal':'Normal'};
+}
+function gauge(key,label,icon,unit){
+ const v=tele[key],c=limits[key],min=c.range[0],max=c.range[1];
+ const pct=v==null?0:Math.max(0,Math.min(100,(Number(v)-min)/(max-min)*100));
+ const st=gaugeStatus(key,v);
+ const color=st.cls==='danger'?'var(--red)':st.cls==='warning'?'var(--orange)':'var(--green)';
+ const decimals=(key==='airHumidity'||key==='waterLevel')?0:1;
+ return `<article class="gauge-card ${st.cls==='danger'?'danger-gauge':''} ${st.cls==='warning'?'warning-gauge':''}"><div class="gauge" style="--pct:${pct}%;--gcolor:${color}"><div class="gauge-inner"><div class="gauge-value">${v==null?'—':Number(v).toFixed(decimals)}${v==null?'':unit}</div></div></div><div class="gauge-label">${icon} ${label}</div><div class="gauge-status ${st.cls}">${st.cls==='danger'?'⚠️ ':st.cls==='warning'?'⚠️ ':''}${st.label}</div></article>`;
+}
 function controlText(ar,en,fr){return lang==='ar'?ar:lang==='fr'?fr:en}
 const controlCfg=JSON.parse(localStorage.getItem('hydro_control_cfg')||'{}');
 const defaults={pump1:{on:15,off:2},pump2:{on:15,off:2},fan2:{on:10,off:10},fan1:{tempOn:30,tempOff:28,humOn:80,humOff:75},pump4:{tempOn:32,tempOff:29,humLowOn:75,humHighOff:80}};
@@ -136,7 +185,7 @@ function controlReason(d,on){if(!on)return controlText('متوقف','Stopped','A
 function controlCard(d){const on=deviceState(d.id),c=cfg(d.id);const detail=d.kind==='cycle'?controlText(`ON ${c.on} د · OFF ${c.off} د`,`ON ${c.on} min · OFF ${c.off} min`,`ON ${c.on} min · OFF ${c.off} min`):d.kind==='threshold'?controlText('تشغيل ≤20% · إيقاف ≥40%','ON ≤20% · OFF ≥40%','ON ≤20% · OFF ≥40%'):d.kind==='pad'?controlText(`حرارة ${c.tempOn}° / ${c.tempOff}° · رطوبة ≤${c.humLowOn}% / ≥${c.humHighOff}%`,`Temp ${c.tempOn}° / ${c.tempOff}° · RH ≤${c.humLowOn}% / ≥${c.humHighOff}%`,`Temp ${c.tempOn}° / ${c.tempOff}° · RH ≤${c.humLowOn}% / ≥${c.humHighOff}%`):`T ${c.tempOn}°/${c.tempOff}° · RH ${c.humOn}%/${c.humOff}%`;return `<article class="control-card"><div class="control-card-top"><div class="control-title"><span class="control-icon">${d.icon}</span><div><b>${d.name}</b><small>${d.sub}</small></div></div><span class="control-state ${on?'on':'off'}"><i>●</i>${on?controlText('يعمل','Running','En marche'):controlText('متوقف','Stopped','Arrêté')}</span></div><div class="control-live"><div class="live-state"><span class="live-dot ${on?'on':''}"></span><strong>${on?controlText('تشغيل','ON','ON'):controlText('إيقاف','OFF','OFF')}</strong><small>${controlReason(d,on)}</small></div><button class="switch ${on?'on':''}" data-device="${d.id}" aria-label="${d.name}"></button></div><div class="control-meta"><span>⚙️ ${detail}</span><span class="mode-chip">${mode}</span></div>${configHTML(d)}</article>`}
 function renderControls(){const all=devices(),ir=all.filter(d=>['pump1','pump2','pump3'].includes(d.id)),cl=all.filter(d=>['pump4','fan1','fan2'].includes(d.id));const a=$('#controlsIrrigation'),b=$('#controlsClimate');if(a)a.innerHTML=ir.map(controlCard).join('');if(b)b.innerHTML=cl.map(controlCard).join('');$$('[data-device]').forEach(x=>x.onclick=()=>toggleDevice(x.dataset.device));$$('[data-save-cfg]').forEach(x=>x.onclick=()=>saveDeviceConfig(x.dataset.saveCfg));updateControlOverview()}
 function updateControlOverview(){const all=devices(),running=all.filter(d=>deviceState(d.id)).length;const r=$('#runningCount'),s=$('#stoppedCount'),m=$('#controlModeTitle'),md=$('#controlModeDesc'),lu=$('#controlLastUpdate'),cb=$('#controlConnectionBadge');if(r)r.textContent=running;if(s)s.textContent=all.length-running;if(m)m.textContent=mode;if(md)md.textContent=mode==='AUTO'?controlText('التشغيل الذكي','Smart operation','Fonctionnement intelligent'):controlText('تحكم مباشر','Direct control','Contrôle direct');if(lu)lu.textContent=history.length?new Date(history[history.length-1].timeMs||history[history.length-1].time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'—';if(cb){const online=document.querySelector('#mqttDot')?.classList.contains('on');cb.className='connection-badge '+(online?'online':'offline');cb.textContent=online?controlText('● متصل','● Online','● En ligne'):controlText('● غير متصل','● Offline','● Hors ligne')}}
-function render(){const g=$('#gauges');g.innerHTML=gauge('airTemperature',t('airTemp'),'🌡️','°C',10,45)+gauge('airHumidity',lang==='ar'?'الرطوبة':lang==='fr'?'Humidité':'Humidity','💧','%',0,100)+gauge('waterTemperature',lang==='ar'?'حرارة الماء':lang==='fr'?'Température de l’eau':'Water Temperature','🌊','°C',5,40)+gauge('waterLevel',lang==='ar'?'مستوى الخزان':lang==='fr'?'Niveau du réservoir':'Water Level','💦','%',0,100)+gauge('ph','pH','🧪','',3,10)+gauge('ec','EC','⚡','',0,4);$('#modeBadge').textContent=mode;$('#modeBadge').className='badge '+(mode==='MANUAL'?'manual':'auto');renderControls();$('#quickDevices').innerHTML=devices().slice(0,3).map(d=>`<div class="quick-row"><span>${d.icon} ${d.name}</span><button class="switch ${deviceState(d.id)?'on':''}" data-device="${d.id}"></button></div>`).join('');$$('[data-device]').forEach(b=>b.onclick=()=>toggleDevice(b.dataset.device));$('#userEmail').textContent=auth.currentUser?.email||'—';applyLang()}
+function render(){const g=$('#gauges');g.innerHTML=gauge('airTemperature',t('airTemp'),'🌡️','°C')+gauge('airHumidity',lang==='ar'?'الرطوبة':lang==='fr'?'Humidité':'Humidity','💧','%')+gauge('waterTemperature',lang==='ar'?'حرارة الماء':lang==='fr'?'Température de l’eau':'Water Temperature','🌊','°C')+gauge('waterLevel',lang==='ar'?'مستوى الخزان':lang==='fr'?'Niveau du réservoir':'Water Level','💦','%')+gauge('ph','pH','🧪','')+gauge('ec','EC','⚡','');$('#modeBadge').textContent=mode;$('#modeBadge').className='badge '+(mode==='MANUAL'?'manual':'auto');renderControls();$('#quickDevices').innerHTML=devices().slice(0,3).map(d=>`<div class="quick-row"><span>${d.icon} ${d.name}</span><button class="switch ${deviceState(d.id)?'on':''}" data-device="${d.id}"></button></div>`).join('');$$('[data-device]').forEach(b=>b.onclick=()=>toggleDevice(b.dataset.device));$('#userEmail').textContent=auth.currentUser?.email||'—';applyLang()}
 function toggleDevice(id){if(mode==='AUTO'){toast(controlText('النظام في AUTO — انتقل إلى MANUAL أولًا','System is AUTO — switch to MANUAL first','Système en AUTO — passez en MANUAL'));return}if(!M.publish({type:'device',device:id,state:'TOGGLE',source:'app'}))toast(controlText('MQTT غير متصل','MQTT offline','MQTT hors ligne'));else toast(controlText('تم إرسال الأمر','Command sent','Commande envoyée'))}
 function saveDeviceConfig(id){const inputs=$$(`[data-cfg^="${id}:"]`);const o={...(controlCfg[id]||{})};inputs.forEach(i=>{const v=Number(i.value);if(Number.isFinite(v))o[i.dataset.cfg.split(':')[1]]=v});controlCfg[id]=o;saveCfg();const payload={type:'config',device:id,settings:o,source:'app'};if(!M.publish(payload))toast(controlText('تم الحفظ محليًا — MQTT غير متصل','Saved locally — MQTT offline','Enregistré localement — MQTT hors ligne'));else toast(controlText('تم حفظ الإعداد وإرساله','Settings saved and sent','Réglages enregistrés et envoyés'));renderControls()}
 $('#autoBtn').onclick=()=>setMode('AUTO');$('#manualBtn').onclick=()=>{showConfirm(()=>setMode('MANUAL'))};function setMode(m){mode=m;localStorage.setItem('hydro_mode',m);M.publish({type:'mode',mode:m,source:'app'});render();toast(m==='AUTO'?controlText('تم تفعيل AUTO','AUTO enabled','AUTO activé'):controlText('تم تفعيل MANUAL','MANUAL enabled','MANUAL activé'))}function showConfirm(ok){$('#modal').innerHTML=`<div class="modal-box"><h3>⚠️ ${controlText('التحكم اليدوي','Manual control','Contrôle manuel')}</h3><p>${controlText('تأكد من أن تشغيل الأجهزة آمن.','Make sure operating the devices is safe.','Vérifiez que le fonctionnement est sûr.')}</p><div class="modal-actions"><button class="danger" id="cancel">${controlText('إلغاء','Cancel','Annuler')}</button><button class="primary" id="continue">${controlText('متابعة','Continue','Continuer')}</button></div></div>`;$('#modal').classList.remove('hidden');$('#modal').style.display='grid';$('#cancel').onclick=closeModal;$('#continue').onclick=()=>{closeModal();ok()}}function closeModal(){const m=$('#modal');m.classList.add('hidden');m.style.display='none'}
