@@ -22,3 +22,6 @@ Topics:
 
 ## Growth
 Growth is independent of ESP32/Nano. Groups and manual pH/EC records are stored in Firestore under the authenticated user's UID.
+
+
+V19: Firebase Cloud Messaging Web Push background support using the provided VAPID public key. Registers firebase-messaging-sw.js and stores the current FCM token under users/{uid}/pushTokens/{deviceId}.
