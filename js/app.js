@@ -1,4 +1,5 @@
-import {auth,db,onAuthStateChanged,signInWithEmailAndPassword,signOut,collection,doc,setDoc,getDocs,deleteDoc,serverTimestamp,query,where,orderBy,limit} from './firebase.js';import * as M from './mqtt.js';
+import {auth,db,messaging,onAuthStateChanged,signInWithEmailAndPassword,signOut,collection,doc,setDoc,getDocs,deleteDoc,serverTimestamp,query,where,orderBy,limit,getToken,onMessage} from './firebase.js';import * as M from './mqtt.js';
+const FCM_VAPID_KEY='BLnNlFZXWarO2KoYWHwZokcTPn2LTawJSQtEvhbE6nOTGe5QfOKruGzK1PHcg5LopjEUCvyMh-W5K21oahPtxGs';
 const I={ar:{appSubtitle:'التحكم الذكي في الزراعة المائية',monitoring:'المراقبة',quickControl:'التحكم السريع',airTemp:'حرارة الهواء',data:'البيانات',control:'التحكم',alerts:'التنبيهات',settings:'الإعدادات',systemMode:'وضع النظام',controlModeHint:'AUTO = التشغيل الذكي · MANUAL = تحكم مباشر',controlSafety:'الأجهزة تعمل حسب قواعد الأمان المحددة. التحكم اليدوي قد يُمنع عند وجود حالة خطرة.',language:'اللغة',theme:'المظهر',mqttPassword:'كلمة مرور MQTT',rememberMqtt:'تذكر كلمة المرور على هذا الجهاز',saveConnect:'حفظ والاتصال',logout:'تسجيل الخروج',home:'الرئيسية',growth:'نمو النباتات',growthSubtitle:'متابعة المراحل والتذكيرات والتسجيل اليدوي',newGroup:'مجموعة جديدة'},en:{appSubtitle:'Smart hydroponic control',monitoring:'Monitoring',quickControl:'Quick control',airTemp:'Air Temperature',data:'Data',control:'Control',alerts:'Alerts',settings:'Settings',systemMode:'System mode',controlModeHint:'AUTO = smart operation · MANUAL = direct control',controlSafety:'Devices follow the defined safety rules. Manual control may be blocked in a dangerous condition.',language:'Language',theme:'Theme',mqttPassword:'MQTT password',rememberMqtt:'Remember password on this device',saveConnect:'Save & Connect',logout:'Sign out',home:'Home',growth:'Plant Growth',growthSubtitle:'Stages, reminders and manual records',newGroup:'New Group'},fr:{appSubtitle:'Contrôle hydroponique intelligent',monitoring:'Surveillance',quickControl:'Contrôle rapide',airTemp:'Température de l’air',data:'Données',control:'Contrôle',alerts:'Alertes',settings:'Paramètres',systemMode:'Mode système',controlModeHint:'AUTO = fonctionnement intelligent · MANUAL = contrôle direct',controlSafety:'Les appareils suivent les règles de sécurité définies. Le contrôle manuel peut être bloqué en cas de danger.',language:'Langue',theme:'Thème',mqttPassword:'Mot de passe MQTT',rememberMqtt:'Mémoriser sur cet appareil',saveConnect:'Enregistrer et connecter',logout:'Déconnexion',home:'Accueil',growth:'Croissance des plantes',growthSubtitle:'Étapes, rappels et relevés manuels',newGroup:'Nouveau groupe'}};
 let lang=localStorage.getItem('hydro_lang')||'ar',mode=localStorage.getItem('hydro_mode')||'AUTO',tele={airTemperature:null,airHumidity:null,waterTemperature:null,waterLevel:null,ph:null,ec:null},deviceStates={},history=[];
 let sensorHistoryLoaded=false,lastSensorSaveMinute=0,sensorSaveBusy=false;
@@ -67,7 +68,48 @@ function checkSensorAlerts(){const checks=[['airTemperature',tele.airTemperature
 async function loadAlerts(){if(!auth.currentUser)return;try{const snap=await getDocs(collection(db,'users',auth.currentUser.uid,'alerts'));alerts=[];snap.forEach(d=>{const a=d.data();if(a&&a.deleted!==true&&Number.isFinite(Number(a.time)))alerts.push(a)});alerts.sort((a,b)=>b.time-a.time);alerts=alerts.slice(0,ALERTS_MAX);alertsLoaded=true;renderAlerts()}catch(e){console.error('Alerts load failed:',e);alertsLoaded=true;renderAlerts();toast(controlText('تعذر تحميل سجل التنبيهات','Could not load alert history','Impossible de charger l’historique des alertes'))}}
 function renderAlerts(){const root=$('#alertsList');if(!root)return;const unread=alerts.filter(a=>a.time>(Number(localStorage.getItem('hydro_alert_seen')||0))).length;const badge=$('#alertCount');if(badge){badge.textContent=unread;badge.style.display=unread?'inline-grid':'none'}if(!alerts.length){root.innerHTML=`<div class="panel alert-empty">${controlText('✅ لا توجد تنبيهات مسجلة','✅ No alerts recorded','✅ Aucune alerte enregistrée')}</div>`;return}root.innerHTML=alerts.map(a=>`<article class="alert-item ${a.level||'info'}"><div class="alert-icon">${a.icon||'🔔'}</div><div class="alert-body"><b>${escapeHtml(a.title||'')}</b><p>${escapeHtml(a.message||'')}</p><small>${new Date(a.time).toLocaleString(lang==='ar'?'ar-TN':lang==='fr'?'fr-FR':'en-GB')}</small></div></article>`).join('')}
 function notificationStatus(){const el=$('#notificationStatus'),btn=$('#notificationPermission');if(!el||!btn)return;const enabled=localStorage.getItem('hydro_notifications')==='on';const perm='Notification'in window?Notification.permission:'unsupported';if(perm==='granted'&&enabled){el.textContent=controlText('🟢 إشعارات الهاتف مفعّلة','🟢 Phone notifications enabled','🟢 Notifications du téléphone activées');btn.textContent=controlText('🔕 إيقاف الإشعارات','🔕 Disable notifications','🔕 Désactiver les notifications');btn.className='secondary'}else if(perm==='denied'){el.textContent=controlText('⚠️ تم رفض الإذن. فعّل الإشعارات من إعدادات المتصفح/التطبيق.','⚠️ Permission denied. Enable notifications in browser/app settings.','⚠️ Permission refusée. Activez les notifications dans les réglages.');btn.textContent=controlText('🔔 فتح الإعدادات لاحقًا','🔔 Enable in settings','🔔 Activer dans les réglages')}else{el.textContent=controlText('الإشعارات غير مفعّلة بعد.','Notifications are not enabled yet.','Les notifications ne sont pas encore activées.');btn.textContent=controlText('🔔 تفعيل إشعارات الهاتف','🔔 Enable phone notifications','🔔 Activer les notifications')}}
-async function enableNotifications(){if(!('Notification'in window)){toast(controlText('هذا الجهاز/المتصفح لا يدعم الإشعارات','This browser/device does not support notifications','Ce navigateur/appareil ne prend pas en charge les notifications'));return}if(Notification.permission==='denied'){notificationStatus();return}const p=await Notification.requestPermission();if(p==='granted'){localStorage.setItem('hydro_notifications','on');notificationStatus();const a={title:controlText('تم تفعيل الإشعارات','Notifications enabled','Notifications activées'),message:controlText('سيتم تنبيهك عند حدوث حالة مهمة في الحساسات أو الاتصال.','You will be notified about important sensor or connection events.','Vous serez averti des événements importants des capteurs ou de la connexion.'),type:'test',level:'info',icon:'🔔',time:Date.now()};showBrowserNotification(a);toast(controlText('تم تفعيل الإشعارات','Notifications enabled','Notifications activées'))}else notificationStatus()}
+async function enableNotifications(){
+ if(!('Notification'in window)){toast(controlText('هذا الجهاز/المتصفح لا يدعم الإشعارات','This browser/device does not support notifications','Ce navigateur/appareil ne prend pas en charge les notifications'));return}
+ if(Notification.permission==='denied'){notificationStatus();return}
+ try{
+  const p=await Notification.requestPermission();
+  if(p!=='granted'){notificationStatus();return}
+  localStorage.setItem('hydro_notifications','on');
+  let fcmOk=false;
+  if(messaging){
+   const sw=await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+   const token=await getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:sw});
+   if(token&&auth.currentUser){
+    const deviceId=localStorage.getItem('hydro_fcm_device_id')||crypto.randomUUID();
+    localStorage.setItem('hydro_fcm_device_id',deviceId);
+    await setDoc(doc(db,'users',auth.currentUser.uid,'pushTokens',deviceId),{token,platform:'web',userAgent:navigator.userAgent,updatedAt:serverTimestamp(),enabled:true},{merge:true});
+    fcmOk=true;
+   }
+  }
+  notificationStatus();
+  const a={title:controlText('تم تفعيل الإشعارات','Notifications enabled','Notifications activées'),message:fcmOk?controlText('تم ربط الجهاز بـ Firebase Cloud Messaging. ستصل التنبيهات في الخلفية.','This device is connected to Firebase Cloud Messaging. Background notifications are enabled.','Cet appareil est connecté à Firebase Cloud Messaging. Les notifications en arrière-plan sont activées.'):controlText('تم تفعيل إشعارات الهاتف.','Phone notifications are enabled.','Les notifications du téléphone sont activées.'),type:'test',level:'info',icon:'🔔',time:Date.now()};
+  showBrowserNotification(a);
+  toast(fcmOk?controlText('تم تفعيل Push Notifications بنجاح','Push Notifications enabled successfully','Notifications Push activées avec succès'):controlText('تم تفعيل إشعارات الهاتف، لكن تعذر تسجيل FCM.','Phone notifications enabled, but FCM registration failed.','Notifications activées, mais l’enregistrement FCM a échoué.'));
+ }catch(e){console.error('FCM registration failed',e);localStorage.setItem('hydro_notifications','on');notificationStatus();toast(controlText('تم تفعيل الإشعارات لكن تعذر ربط Firebase. تحقق من الاتصال.','Notifications enabled, but Firebase registration failed. Check your connection.','Notifications activées, mais l’enregistrement Firebase a échoué. Vérifiez la connexion.'))}
+}
+
+async function initFCM(){
+ if(!messaging)return;
+ if(!auth.currentUser||Notification.permission!=='granted'||localStorage.getItem('hydro_notifications')!=='on')return;
+ try{
+  const sw=await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+  const token=await getToken(messaging,{vapidKey:FCM_VAPID_KEY,serviceWorkerRegistration:sw});
+  if(token){
+   const deviceId=localStorage.getItem('hydro_fcm_device_id')||crypto.randomUUID();
+   localStorage.setItem('hydro_fcm_device_id',deviceId);
+   await setDoc(doc(db,'users',auth.currentUser.uid,'pushTokens',deviceId),{token,platform:'web',userAgent:navigator.userAgent,updatedAt:serverTimestamp(),enabled:true},{merge:true});
+  }
+  if(!window.__fcmForegroundBound){
+   onMessage(messaging,payload=>{const n=payload.notification||{};const a={title:n.title||'Hydroponic Control',message:n.body||'',type:'push',level:'info',icon:'🔔',time:Date.now()};showBrowserNotification(a);});
+   window.__fcmForegroundBound=true;
+  }
+ }catch(e){console.warn('FCM init failed',e)}
+}
 function initAlerts(){const b=$('#notificationPermission'),c=$('#clearAlerts');if(b)b.onclick=()=>{if(localStorage.getItem('hydro_notifications')==='on'&&Notification.permission==='granted'){localStorage.setItem('hydro_notifications','off');notificationStatus()}else enableNotifications()};if(c)c.onclick=async()=>{if(!confirm(controlText('مسح سجل التنبيهات؟','Clear alert history?','Effacer l’historique des alertes ?')))return;alerts=[];alertState={};localStorage.removeItem('hydro_alert_state');if(auth.currentUser){try{const snap=await getDocs(collection(db,'users',auth.currentUser.uid,'alerts'));for(const d of snap.docs)await deleteDoc(d.ref)}catch(e){console.warn(e)}}renderAlerts();toast(controlText('تم مسح سجل التنبيهات','Alert history cleared','Historique des alertes effacé'))};notificationStatus();renderAlerts()}
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}function t(k){return I[lang][k]||I.ar[k]||k}function applyLang(){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';$$('[data-i18n]').forEach(e=>e.textContent=t(e.dataset.i18n));$('#language').value=lang;localStorage.setItem('hydro_lang',lang)}
@@ -267,4 +309,4 @@ $$('[data-data-range]').forEach(b=>b.onclick=()=>{dataRange=b.dataset.dataRange;
 window.addEventListener('resize',()=>{if($('#data').classList.contains('active'))renderData()});
 
 document.addEventListener('DOMContentLoaded',()=>{const m=document.getElementById('modal');if(m)m.style.display='none';});
-onAuthStateChanged(auth,u=>{if(!u){showLogin();return}hideLogin();$('#userEmail').textContent=u.email;applyTheme();applyLang();render();initAlerts();loadAlerts();loadSensorHistory();if(M.password())setTimeout(()=>M.connect(),500)});applyTheme();
+onAuthStateChanged(auth,u=>{if(!u){showLogin();return}hideLogin();$('#userEmail').textContent=u.email;applyTheme();applyLang();render();initAlerts();loadAlerts();loadSensorHistory();initFCM();if(M.password())setTimeout(()=>M.connect(),500)});applyTheme();
